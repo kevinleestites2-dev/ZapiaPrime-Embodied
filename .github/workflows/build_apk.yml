@@ -12,30 +12,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Set up Flutter
+      - name: Set up Flutter 3.24.5
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.0'
+          flutter-version: '3.24.5'
           channel: 'stable'
 
-      - name: Create new Flutter project scaffold
-        run: |
-          flutter create --org com.pantheon --project-name zapia_prime zapia_build
-          cd zapia_build
-          # Enable android build
-          flutter config --enable-android
+      - name: Create Flutter project scaffold
+        run: flutter create --org com.pantheon --project-name zapia_prime zapia_build
 
       - name: Inject ZapiaPrime source
-        run: |
-          cp JarvisAppFlutter/zapia_prime.dart zapia_build/lib/main.dart
+        run: cp JarvisAppFlutter/zapia_prime.dart zapia_build/lib/main.dart
 
-      - name: Write pubspec.yaml with dependencies
+      - name: Write pubspec.yaml
         working-directory: zapia_build
         run: |
           cat > pubspec.yaml << 'PUBEOF'
@@ -50,37 +45,51 @@ jobs:
               sdk: flutter
             http: ^1.2.0
             speech_to_text: ^6.6.0
-            flutter_tts: ^4.0.2
+            flutter_tts: ^3.8.5
             url_launcher: ^6.2.5
             android_intent_plus: ^4.0.2
             intl: ^0.19.0
-            audioplayers: ^6.0.0
+            audioplayers: ^5.2.1
           flutter:
             uses-material-design: true
             assets:
               - assets/sounds/
           PUBEOF
 
-      - name: Create assets directory with placeholder sound
+      - name: Create placeholder wake sound
         working-directory: zapia_build
         run: |
           mkdir -p assets/sounds
-          # Create a minimal valid MP3 (silence) so asset exists
           printf '\xff\xfb\x90\x00' > assets/sounds/wake.mp3
 
-      - name: Add android permissions to AndroidManifest
+      - name: Patch AndroidManifest permissions
         working-directory: zapia_build
         run: |
-          # Inject required permissions before </manifest>
-          sed -i 's|<uses-permission android:name="android.permission.INTERNET"/>||g' android/app/src/main/AndroidManifest.xml
-          sed -i 's|<manifest|<manifest xmlns:tools="http://schemas.android.com/tools"|g' android/app/src/main/AndroidManifest.xml
-          sed -i 's|</manifest>|    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>\n    <uses-permission android:name="android.permission.VIBRATE"/>\n    <uses-feature android:name="android.hardware.microphone" android:required="true"/>\n</manifest>|g' android/app/src/main/AndroidManifest.xml
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          sed -i 's|</manifest>|    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n    <uses-permission android:name="android.permission.VIBRATE"/>\n    <uses-feature android:name="android.hardware.microphone" android:required="true"/>\n</manifest>|' "$MANIFEST"
 
-      - name: Set minimum SDK version
+      - name: Set minSdk to 23
         working-directory: zapia_build
         run: |
-          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/' android/app/build.gradle.kts || \
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/' android/app/build.gradle
+          if grep -q "minSdk = flutter.minSdkVersion" android/app/build.gradle.kts 2>/dev/null; then
+            sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/' android/app/build.gradle.kts
+          fi
+          if grep -q "minSdkVersion flutter.minSdkVersion" android/app/build.gradle 2>/dev/null; then
+            sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/' android/app/build.gradle
+          fi
+          # Also patch local.properties fallback
+          echo "flutter.minSdkVersion=23" >> android/local.properties
+
+      - name: Set Kotlin version compatibility
+        working-directory: zapia_build
+        run: |
+          # Ensure kotlin version in android/build.gradle is 1.9.x
+          if grep -q "kotlin_version" android/build.gradle 2>/dev/null; then
+            sed -i "s/ext.kotlin_version = .*/ext.kotlin_version = '1.9.10'/" android/build.gradle
+          fi
+          if grep -q "kotlin_version" android/build.gradle.kts 2>/dev/null; then
+            sed -i "s/val kotlinVersion = .*/val kotlinVersion = \"1.9.10\"/" android/build.gradle.kts
+          fi
 
       - name: Flutter pub get
         working-directory: zapia_build
@@ -90,7 +99,7 @@ jobs:
         working-directory: zapia_build
         run: flutter build apk --release --no-tree-shake-icons
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: ZapiaPrime-APK
