@@ -172,6 +172,10 @@ class _ZapiaScreenState extends State<ZapiaScreen>
   late AnimationController _colorCtrl;
   late Animation<Color?> _colorAnim;
 
+  // ─── TEXT INPUT ────────────────────────────────────────────────────────────
+  final TextEditingController _textCtrl = TextEditingController();
+  final FocusNode _textFocus = FocusNode();
+
   @override
   void initState() {
     super.initState();
@@ -333,6 +337,136 @@ class _ZapiaScreenState extends State<ZapiaScreen>
     if (_isAlwaysOn) _startAlwaysOn();
   }
 
+  // ── TEXT INPUT BOTTOM SHEET ───────────────────────────────────────────────
+  void _openKeyboard() {
+    if (speech.isListening) speech.stop();
+    _textCtrl.clear();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Color(0xFF0D0D0D),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border(
+                top:   BorderSide(color: kGold.withOpacity(0.6), width: 1.5),
+                left:  BorderSide(color: kGold.withOpacity(0.3), width: 1),
+                right: BorderSide(color: kGold.withOpacity(0.3), width: 1),
+              ),
+              boxShadow: [
+                BoxShadow(color: kGold.withOpacity(0.15), blurRadius: 30, spreadRadius: 5),
+              ],
+            ),
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40, height: 4,
+                    decoration: BoxDecoration(
+                      color: kGold.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 14),
+                Text(
+                  'TYPE YOUR COMMAND',
+                  style: TextStyle(
+                    color: kGold.withOpacity(0.7),
+                    fontSize: 11,
+                    letterSpacing: 3,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 10),
+                Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _textCtrl,
+                      focusNode: _textFocus,
+                      autofocus: true,
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      cursorColor: kGold,
+                      decoration: InputDecoration(
+                        hintText: 'Ask ZapiaPrime anything...',
+                        hintStyle: TextStyle(color: Colors.white30),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.05),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: kPurple.withOpacity(0.5)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: kGold, width: 1.5),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: kPurple.withOpacity(0.4)),
+                        ),
+                      ),
+                      onSubmitted: (val) {
+                        Navigator.pop(ctx);
+                        _submitTextInput(val);
+                      },
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  GestureDetector(
+                    onTap: () {
+                      final val = _textCtrl.text.trim();
+                      Navigator.pop(ctx);
+                      _submitTextInput(val);
+                    },
+                    child: Container(
+                      width: 48, height: 48,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [kGold, kAmber],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(color: kGold.withOpacity(0.5), blurRadius: 12, spreadRadius: 2),
+                        ],
+                      ),
+                      child: Icon(Icons.send_rounded, color: Colors.black, size: 22),
+                    ),
+                  ),
+                ]),
+                SizedBox(height: 8),
+                Text('Press Enter or tap ⬆ to send',
+                    style: TextStyle(color: Colors.white24, fontSize: 11)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    Future.delayed(Duration(milliseconds: 100), () => _textFocus.requestFocus());
+  }
+
+  void _submitTextInput(String val) {
+    if (val.isEmpty) return;
+    setState(() {
+      _isConvoMode    = true;
+      _isWakeDetected = true;
+      _statusText     = 'PROCESSING...';
+    });
+    _processQuery(val);
+  }
+
   // ── QUERY ────────────────────────────────────────────────────────────────
   Future<void> _processQuery(String query) async {
     setState(() => _statusText = 'PROCESSING...');
@@ -439,6 +573,8 @@ class _ZapiaScreenState extends State<ZapiaScreen>
     _bgAnimTimer?.cancel();
     speech.stop();
     _audioPlayer.dispose();
+    _textCtrl.dispose();
+    _textFocus.dispose();
     super.dispose();
   }
 
@@ -446,6 +582,31 @@ class _ZapiaScreenState extends State<ZapiaScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      // ─── KEYBOARD FAB ────────────────────────────────────────────────────
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openKeyboard,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          width: 56, height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: [kDeepPurple, kPurple],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            border: Border.all(color: kGold.withOpacity(0.7), width: 1.5),
+            boxShadow: [
+              BoxShadow(color: kGold.withOpacity(0.35),   blurRadius: 16, spreadRadius: 2),
+              BoxShadow(color: kPurple.withOpacity(0.4),  blurRadius: 24, spreadRadius: 4),
+            ],
+          ),
+          child: Icon(Icons.keyboard_rounded, color: kGold, size: 26),
+        ),
+        tooltip: 'Type a command',
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       appBar: AppBar(
         backgroundColor: Colors.black.withOpacity(0.3),
         elevation: 0,
@@ -501,16 +662,14 @@ class _ZapiaScreenState extends State<ZapiaScreen>
             child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               if (_isAlwaysOn)
                 Container(
-                  width: 8,
-                  height: 8,
+                  width: 8, height: 8,
                   decoration: BoxDecoration(
                     color: _isConvoMode ? kPurple : kGold,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
                           color: _isConvoMode ? kPurple : kGold,
-                          blurRadius: 8,
-                          spreadRadius: 2)
+                          blurRadius: 8, spreadRadius: 2)
                     ],
                   ),
                 ),
@@ -544,8 +703,7 @@ class _ZapiaScreenState extends State<ZapiaScreen>
                       ? _pulseAnim.value
                       : 1.0,
                   child: Container(
-                    width: 200,
-                    height: 200,
+                    width: 200, height: 200,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
@@ -553,13 +711,14 @@ class _ZapiaScreenState extends State<ZapiaScreen>
                         radius: 0.9,
                       ),
                       boxShadow: [
-                        BoxShadow(color: c.withOpacity(0.6), blurRadius: 40, spreadRadius: 10),
-                        BoxShadow(color: kPurple.withOpacity(0.3), blurRadius: 70, spreadRadius: 20),
+                        BoxShadow(color: c.withOpacity(0.6),        blurRadius: 40, spreadRadius: 10),
+                        BoxShadow(color: kPurple.withOpacity(0.3),  blurRadius: 70, spreadRadius: 20),
                       ],
                       border: Border.all(color: c.withOpacity(0.6), width: 2),
                     ),
                     child: Stack(alignment: Alignment.center, children: [
-                      CustomPaint(painter: TrianglePainter(color: c), child: SizedBox(width: 200, height: 200)),
+                      CustomPaint(painter: TrianglePainter(color: c),
+                          child: SizedBox(width: 200, height: 200)),
                       Text('Z',
                           style: TextStyle(
                               color: c,
@@ -585,7 +744,7 @@ class _ZapiaScreenState extends State<ZapiaScreen>
               ),
             ),
           SizedBox(height: 20),
-          Text('TAP ORB  •  OR SAY  "HEY ZAPIA"',
+          Text('TAP ORB  •  SAY "HEY ZAPIA"  •  OR ⌨️ TYPE',
               style: TextStyle(color: Colors.white24, fontSize: 10, letterSpacing: 2)),
         ]),
       ]),
