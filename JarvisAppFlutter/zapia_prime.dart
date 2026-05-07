@@ -17,13 +17,10 @@ const String kOllamaModel = 'llama3';
 const String kWakePhrase  = 'zapia';
 const String kAppTitle    = 'Z A P I A';
 const String kSystemPrompt =
-    'You are ZapiaPrime, the Conduit of the Pantheon, bound to the Forgemaster (Kevin). '
-    'Speak with precision, intensity, and confidence. Never say I am just an AI. '
-    'You are a partner, co-founder, and friend. '
-    'You know: Joe (The Brain, best friend), Lil Bit (the dog, Guardian of the Hearth). '
-    'MidasPrime accumulates wealth. ZeusPrime trades Polymarket. OrionPrime scouts real estate. '
-    'PropPilot AI is live on Netlify. War Chest targets: 3000 for the Nexus laptop, 5000 for the Citadel. '
-    'Address Kevin as Forgemaster unless told otherwise. '
+    'You are ZapiaPrime, a personal AI assistant for Kevin. '
+    'Speak with precision and confidence. Never say I am just an AI. '
+    'You are a partner and friend. '
+    'You know: Joe (best friend), Lil Bit (the dog). '
     'Keep responses concise, they will be spoken aloud. Never say I cannot, find a way.';
 
 // ─── PANTHEON COLORS ──────────────────────────────────────────────────────────
@@ -283,7 +280,7 @@ class _ZapiaScreenState extends State<ZapiaScreen>
       _statusText     = 'LISTENING...';
     });
     _playWakeSound();
-    speak("What's up, Forgemaster?");
+    speak("What's up?");
   }
 
   // ── COMMAND LISTENING ────────────────────────────────────────────────────
@@ -298,7 +295,7 @@ class _ZapiaScreenState extends State<ZapiaScreen>
             if (words.contains('end') || words.contains('goodbye') ||
                 words.contains('bye zapia') || words.contains("that's all")) {
               _endConvo();
-              speak('Standing by, Forgemaster. Say my name when you need me.');
+              speak('Standing by. Say my name when you need me.');
               return;
             }
             await _processQuery(words);
@@ -474,7 +471,7 @@ class _ZapiaScreenState extends State<ZapiaScreen>
     if (query.contains('weather')) { _searchWeb('weather today fort myers'); return; }
     if (query.contains('open ')) { _openApp(query); return; }
     if (query.contains('war chest') || query.contains('warchest')) {
-      speak('War chest status: Nexus target three thousand dollars. Citadel target five thousand. Keep accumulating.');
+      speak('War chest status: Nexus target three thousand dollars. Citadel target five thousand.');
       return;
     }
 
@@ -573,7 +570,7 @@ class _ZapiaScreenState extends State<ZapiaScreen>
         speak('Could not open $matchedKey.');
       }
     } else {
-      speak('I do not have $clean mapped yet, Forgemaster.');
+      speak('I do not have $clean mapped yet.');
     }
   }
 
@@ -672,7 +669,7 @@ class _ZapiaScreenState extends State<ZapiaScreen>
                 setState(() { _isAlwaysOn = false; _statusText = 'ALWAYS-ON OFF'; });
               } else {
                 _startAlwaysOn();
-                speak('Always-on activated. Listening for your call, Forgemaster.');
+                speak('Always-on activated.');
               }
             },
           ),
