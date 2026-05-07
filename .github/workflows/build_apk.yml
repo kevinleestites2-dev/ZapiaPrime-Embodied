@@ -24,21 +24,23 @@ jobs:
           flutter-version: '3.22.0'
           channel: 'stable'
 
-      - name: Create assets directory
+      - name: Create new Flutter project scaffold
         run: |
-          mkdir -p JarvisAppFlutter/assets/sounds
-          touch JarvisAppFlutter/assets/sounds/wake.mp3
+          flutter create --org com.pantheon --project-name zapia_prime zapia_build
+          cd zapia_build
+          # Enable android build
+          flutter config --enable-android
 
-      - name: Copy main dart file
+      - name: Inject ZapiaPrime source
         run: |
-          cp JarvisAppFlutter/zapia_prime.dart JarvisAppFlutter/lib/main.dart 2>/dev/null || true
+          cp JarvisAppFlutter/zapia_prime.dart zapia_build/lib/main.dart
 
-      - name: Write pubspec.yaml
-        working-directory: JarvisAppFlutter
+      - name: Write pubspec.yaml with dependencies
+        working-directory: zapia_build
         run: |
-          cat > pubspec.yaml << 'EOF'
+          cat > pubspec.yaml << 'PUBEOF'
           name: zapia_prime
-          description: ZapiaPrime The Conduit of the Pantheon
+          description: ZapiaPrime - The Conduit of the Pantheon
           publish_to: none
           version: 1.0.0+1
           environment:
@@ -57,25 +59,40 @@ jobs:
             uses-material-design: true
             assets:
               - assets/sounds/
-          EOF
+          PUBEOF
 
-      - name: Create lib directory and copy main
-        working-directory: JarvisAppFlutter
+      - name: Create assets directory with placeholder sound
+        working-directory: zapia_build
         run: |
-          mkdir -p lib
-          cp zapia_prime.dart lib/main.dart
+          mkdir -p assets/sounds
+          # Create a minimal valid MP3 (silence) so asset exists
+          printf '\xff\xfb\x90\x00' > assets/sounds/wake.mp3
+
+      - name: Add android permissions to AndroidManifest
+        working-directory: zapia_build
+        run: |
+          # Inject required permissions before </manifest>
+          sed -i 's|<uses-permission android:name="android.permission.INTERNET"/>||g' android/app/src/main/AndroidManifest.xml
+          sed -i 's|<manifest|<manifest xmlns:tools="http://schemas.android.com/tools"|g' android/app/src/main/AndroidManifest.xml
+          sed -i 's|</manifest>|    <uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO"/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>\n    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>\n    <uses-permission android:name="android.permission.VIBRATE"/>\n    <uses-feature android:name="android.hardware.microphone" android:required="true"/>\n</manifest>|g' android/app/src/main/AndroidManifest.xml
+
+      - name: Set minimum SDK version
+        working-directory: zapia_build
+        run: |
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/' android/app/build.gradle.kts || \
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/' android/app/build.gradle
 
       - name: Flutter pub get
-        working-directory: JarvisAppFlutter
+        working-directory: zapia_build
         run: flutter pub get
 
-      - name: Build APK
-        working-directory: JarvisAppFlutter
+      - name: Build release APK
+        working-directory: zapia_build
         run: flutter build apk --release --no-tree-shake-icons
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ZapiaPrime-APK
-          path: JarvisAppFlutter/build/app/outputs/flutter-apk/app-release.apk
+          path: zapia_build/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
