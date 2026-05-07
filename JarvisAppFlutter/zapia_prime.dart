@@ -518,34 +518,75 @@ class _ZapiaScreenState extends State<ZapiaScreen>
 
   void _openApp(String query) async {
     final clean = query.replaceAll('open', '').trim();
-    final Map<String, String> apps = {
-      'chrome':   'com.android.chrome',
-      'whatsapp': 'com.whatsapp',
-      'youtube':  'com.google.android.youtube',
-      'maps':     'com.google.android.apps.maps',
-      'gmail':    'com.google.android.gm',
-      'settings': 'com.android.settings',
-      'termux':   'com.termux',
-      'camera':   'com.android.camera',
-      'spotify':  'com.spotify.music',
-      'telegram': 'org.telegram.messenger',
+
+    // Map: keyword → {package, component}
+    final Map<String, Map<String, String>> apps = {
+      'youtube':  {'pkg': 'com.google.android.youtube',       'comp': 'com.google.android.youtube.HomeActivity'},
+      'chrome':   {'pkg': 'com.android.chrome',               'comp': 'com.google.android.apps.chrome.Main'},
+      'whatsapp': {'pkg': 'com.whatsapp',                     'comp': 'com.whatsapp.Main'},
+      'maps':     {'pkg': 'com.google.android.apps.maps',     'comp': 'com.google.android.maps.MapsActivity'},
+      'gmail':    {'pkg': 'com.google.android.gm',            'comp': 'com.google.android.gm.ConversationListActivityGmail'},
+      'settings': {'pkg': 'com.android.settings',             'comp': 'com.android.settings.Settings'},
+      'termux':   {'pkg': 'com.termux',                       'comp': 'com.termux.app.TermuxActivity'},
+      'camera':   {'pkg': 'com.android.camera2',              'comp': 'com.android.camera.CameraLauncher'},
+      'spotify':  {'pkg': 'com.spotify.music',                'comp': 'com.spotify.music.MainActivity'},
+      'telegram': {'pkg': 'org.telegram.messenger',           'comp': 'org.telegram.messenger.DefaultIcon'},
+      'instagram':{'pkg': 'com.instagram.android',            'comp': 'com.instagram.android.activity.MainTabActivity'},
+      'twitter':  {'pkg': 'com.twitter.android',              'comp': 'com.twitter.android.StartActivity'},
+      'tiktok':   {'pkg': 'com.zhiliaoapp.musically',         'comp': 'com.ss.android.ugc.aweme.main.MainActivity'},
+      'netflix':  {'pkg': 'com.netflix.mediaclient',          'comp': 'com.netflix.mediaclient.ui.launch.UIWebViewActivity'},
+      'calculator':{'pkg':'com.android.calculator2',          'comp': 'com.android.calculator2.Calculator'},
+      'clock':    {'pkg': 'com.android.deskclock',            'comp': 'com.android.deskclock.DeskClock'},
+      'files':    {'pkg': 'com.google.android.apps.nbu.files','comp': 'com.google.android.apps.nbu.files.home.HomeActivity'},
+      'phone':    {'pkg': 'com.android.dialer',               'comp': 'com.android.dialer.main.impl.MainActivity'},
+      'contacts': {'pkg': 'com.android.contacts',             'comp': 'com.android.contacts.activities.PeopleActivity'},
+      'messages': {'pkg': 'com.google.android.apps.messaging','comp': 'com.google.android.apps.messaging.ui.ConversationListActivity'},
     };
-    String? pkg;
+
+    Map<String, String>? app;
+    String matchedKey = '';
     for (final e in apps.entries) {
-      if (clean.contains(e.key)) { pkg = e.value; break; }
+      if (clean.contains(e.key)) { app = e.value; matchedKey = e.key; break; }
     }
-    if (pkg != null) {
+
+    if (app != null) {
+      // First try: direct URL scheme (cleanest — no chooser)
+      try {
+        final Uri? deepLink = _getDeepLink(matchedKey);
+        if (deepLink != null) {
+          await launchUrl(deepLink, mode: LaunchMode.externalApplication);
+          speak('Opening $matchedKey.');
+          return;
+        }
+      } catch (_) {}
+
+      // Fallback: explicit component intent
       try {
         await AndroidIntent(
           action: 'android.intent.action.MAIN',
-          category: 'android.intent.category.LAUNCHER',
-          package: pkg,
+          package: app['pkg']!,
+          componentName: app['comp']!,
           flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
         ).launch();
-        speak('Opening $clean.');
-      } catch (_) { speak('Could not open $clean.'); }
+        speak('Opening $matchedKey.');
+      } catch (_) {
+        speak('Could not open $matchedKey.');
+      }
     } else {
       speak('I do not have $clean mapped yet, Forgemaster.');
+    }
+  }
+
+  Uri? _getDeepLink(String key) {
+    switch (key) {
+      case 'youtube':   return Uri.parse('vnd.youtube://');
+      case 'whatsapp':  return Uri.parse('whatsapp://');
+      case 'spotify':   return Uri.parse('spotify:');
+      case 'instagram': return Uri.parse('instagram://');
+      case 'twitter':   return Uri.parse('twitter://');
+      case 'telegram':  return Uri.parse('tg://');
+      case 'netflix':   return Uri.parse('nflx://');
+      default: return null;
     }
   }
 
